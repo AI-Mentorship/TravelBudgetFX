@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import './AIAssistant.css'
+import 'AIAssistant.css'
 import { sendChatMessage, type ChatMessage as ChatMessageType } from '../services/api'
 
 interface AIAssistantProps {
