@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, status
-from app.core.supabase import supabase
 import httpx
 from app.core.config import settings
 from typing import List, Dict
