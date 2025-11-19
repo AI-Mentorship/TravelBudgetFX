@@ -1,18 +1,8 @@
-from pydantic import BaseModel, EmailStr, UUID4
+from pydantic import BaseModel, UUID4
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List
 
-class UserBase(BaseModel):
-    email: EmailStr
-
-class UserCreate(UserBase):
-    password: str
-
-class User(UserBase):
-    id: UUID4
-    created_at: datetime
-    
 class TravelBudgetBase(BaseModel):
     title: str
     description: Optional[str] = None
@@ -26,7 +16,6 @@ class TravelBudgetCreate(TravelBudgetBase):
 
 class TravelBudget(TravelBudgetBase):
     id: UUID4
-    user_id: UUID4
     created_at: datetime
     updated_at: datetime
     estimated_total: Decimal

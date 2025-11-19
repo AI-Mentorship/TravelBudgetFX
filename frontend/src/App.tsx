@@ -2,11 +2,13 @@ import { useState } from 'react'
 import LandingPage from './components/LandingPage'
 import TripDetails from './components/TripDetails'
 import AIAssistant from './components/AIAssistant'
+import type { TripData } from './types'
 
 type Page = 'landing' | 'tripDetails' | 'aiAssistant'
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('landing')
+  const [tripData, setTripData] = useState<TripData | null>(null)
 
   const handleGetStarted = () => {
     setCurrentPage('tripDetails')
@@ -20,7 +22,8 @@ function App() {
     setCurrentPage('tripDetails')
   }
 
-  const handleContinueToAI = () => {
+  const handleContinueToAI = (data: TripData) => {
+    setTripData(data)
     setCurrentPage('aiAssistant')
   }
 
@@ -36,6 +39,7 @@ function App() {
       return (
         <AIAssistant
           onBack={handleBackToTripDetails}
+          tripData={tripData}
         />
       )
     default:

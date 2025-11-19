@@ -7,13 +7,12 @@ import uuid
 router = APIRouter()
 
 @router.post("/", response_model=TravelBudget)
-async def create_budget(budget: TravelBudgetCreate, user_id: str):
+async def create_budget(budget: TravelBudgetCreate):
     try:
         supabase = get_supabase()
         data = {
             **budget.model_dump(),
             "id": str(uuid.uuid4()),
-            "user_id": user_id,
         }
         result = supabase.table("travel_budgets").insert(data).execute()
         return result.data[0]
@@ -29,10 +28,10 @@ async def create_budget(budget: TravelBudgetCreate, user_id: str):
         )
 
 @router.get("/", response_model=List[TravelBudget])
-async def get_user_budgets(user_id: str):
+async def get_all_budgets():
     try:
         supabase = get_supabase()
-        result = supabase.table("travel_budgets").select("*").eq("user_id", user_id).execute()
+        result = supabase.table("travel_budgets").select("*").execute()
         return result.data
     except ValueError as e:
         raise HTTPException(

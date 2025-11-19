@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import './TripDetails.css'
+import type { TripData } from '../types'
 
 interface TripDetailsProps {
-  onContinue: () => void
+  onContinue: (data: TripData) => void
   onBack: () => void
 }
 
@@ -16,16 +17,17 @@ function TripDetails({ onContinue, onBack }: TripDetailsProps) {
   const handleContinue = () => {
     // Validate that all fields are filled
     if (homeCurrency && budget && country && duration && travelDate) {
-      // You can pass the data to the parent component or store it
-      onContinue()
+      // Pass the data to the parent component
+      onContinue({
+        homeCurrency,
+        budget,
+        country,
+        duration,
+        travelDate
+      })
     } else {
       alert('Please fill in all fields before continuing.')
     }
-  }
-
-  const handleCalculateBudget = () => {
-    // Handle budget calculation
-    console.log('Calculate budget:', { homeCurrency, budget, country, duration, travelDate })
   }
 
   return (
@@ -108,10 +110,6 @@ function TripDetails({ onContinue, onBack }: TripDetailsProps) {
               onChange={(e) => setDuration(e.target.value)}
             />
           </div>
-          
-          <button className="calculate-button" onClick={handleCalculateBudget}>
-            Calculate Budget
-          </button>
           
           <button className="continue-button" onClick={handleContinue}>
             Continue

@@ -104,11 +104,18 @@
 }
 
 .ai-assistant-content {
-  max-width: 800px;
+  display: flex;
+  gap: 2rem;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 2rem;
   position: relative;
   z-index: 1;
+}
+
+.main-chat-area {
+  flex: 1;
+  min-width: 0;
 }
 
 .ai-assistant-title {
@@ -153,6 +160,20 @@
   border-radius: 3px;
 }
 
+.typing-indicator {
+  display: inline-block;
+  animation: typing 1.4s infinite;
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 0.3;
+  }
+}
+
 .chat-message {
   padding: 1rem;
   border-radius: 12px;
@@ -162,6 +183,31 @@
   font-size: 0.95rem;
   line-height: 1.5;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  white-space: pre-wrap;
+}
+
+.itinerary-message {
+  max-width: 100%;
+  background: linear-gradient(135deg, rgba(75, 0, 130, 0.7), rgba(139, 69, 139, 0.7));
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.export-pdf-button {
+  display: block;
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.export-pdf-button:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
 }
 
 .ai-message {
@@ -239,6 +285,7 @@
 @media (max-width: 768px) {
   .ai-assistant-content {
     padding: 1rem;
+    flex-direction: column;
   }
   
   .ai-assistant-title {
@@ -250,5 +297,145 @@
     padding: 1.5rem;
     height: 500px;
   }
+  
+  .rating-sidebar {
+    width: 100%;
+  }
+}
+
+/* Trip Summary */
+.trip-summary {
+  background: rgba(50, 50, 50, 0.6);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.trip-summary h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.trip-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.trip-summary-grid div {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.trip-summary-grid strong {
+  color: rgba(139, 69, 139, 1);
+  margin-right: 0.5rem;
+}
+
+/* Chat Progress */
+.chat-progress {
+  padding: 0.75rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 0.5rem;
+}
+
+.progress-text {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+}
+
+.ready-indicator {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+/* Rating Sidebar */
+.rating-sidebar {
+  width: 320px;
+  background: rgba(30, 30, 30, 0.8);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  height: fit-content;
+  position: sticky;
+  top: 2rem;
+}
+
+.rating-sidebar h3 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #ffffff;
+  text-align: center;
+}
+
+.rating-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.rating-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rating-item.overall {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rating-item.overall .rating-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #4ade80;
+}
+
+.rating-label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.rating-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.rating-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.rating-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(139, 69, 139, 1), rgba(138, 43, 226, 1));
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.rating-info {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rating-note {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.4;
+  margin: 0;
+  text-align: center;
 }
 

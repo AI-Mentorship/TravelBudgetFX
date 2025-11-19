@@ -1,11 +1,12 @@
-from typing import List, Optional
+from typing import List
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 
 class Settings(BaseSettings):
     # API Settings
-    ENVIRONMENT: str = "development"
-    DEBUG: bool = True
-    API_V1_PREFIX: str = "/api/v1"
+    ENVIRONMENT: str
+    DEBUG: bool
+    API_V1_PREFIX: str
     
     # Supabase Settings
     SUPABASE_URL: str = ""
@@ -17,9 +18,14 @@ class Settings(BaseSettings):
     SKYSCANNER_API_KEY: str = ""
     BOOKING_API_KEY: str = ""
     GOOGLE_AI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
     
     # CORS Settings
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    
+    @property
+    def get_allowed_origins(self) -> List[str]:
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(',')]
     
     class Config:
         env_file = ".env"
