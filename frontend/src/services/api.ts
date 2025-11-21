@@ -37,3 +37,41 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatRespons
   }
 }
 
+export interface ForecastRequest {
+  base_currency: string
+  target_currency: string
+  days?: number
+}
+
+export interface ForecastData {
+  date: string
+  rate: number
+}
+
+export async function getCurrencyForecast(request: ForecastRequest): Promise<ForecastData[]> {
+  try {
+    const params = new URLSearchParams({
+      base_currency: request.base_currency,
+      target_currency: request.target_currency,
+      days: (request.days || 30).toString()
+    })
+    
+    const response = await fetch(`${API_BASE_URL}/forecasts/currency?${params}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: response.statusText }))
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching currency forecast:', error)
+    throw error
+  }
+}
+

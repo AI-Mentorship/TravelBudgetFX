@@ -1,0 +1,128 @@
+.fx-forecast-container {
+    margin-top: 2rem;
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    animation: slideUp 0.6s ease-out forwards;
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+@keyframes slideUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fx-forecast-header {
+    margin-bottom: 1.5rem;
+}
+
+.fx-forecast-header h3 {
+    font-size: 1.5rem;
+    margin: 0 0 0.5rem 0;
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.fx-forecast-header p {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.chart-container {
+    position: relative;
+    height: 250px;
+    width: 100%;
+    margin: 2rem 0;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+.chart-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.chart-line {
+    fill: none;
+    stroke: #4facfe;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 8px rgba(79, 172, 254, 0.5));
+}
+
+.chart-area {
+    fill: url(#gradient);
+    opacity: 0.3;
+}
+
+.chart-grid-line {
+    stroke: rgba(255, 255, 255, 0.1);
+    stroke-width: 1;
+}
+
+.chart-axis-text {
+    fill: rgba(255, 255, 255, 0.5);
+    font-size: 10px;
+    font-family: 'Inter', sans-serif;
+}
+
+.recommendation-card {
+    background: linear-gradient(135deg, rgba(79, 172, 254, 0.1) 0%, rgba(0, 242, 254, 0.1) 100%);
+    border: 1px solid rgba(79, 172, 254, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.recommendation-icon {
+    font-size: 2rem;
+}
+
+.recommendation-content h4 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.1rem;
+    color: #fff;
+}
+
+.recommendation-content p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.highlight-rate {
+    color: #00f2fe;
+    font-weight: bold;
+}
+
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.tooltip {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+}
