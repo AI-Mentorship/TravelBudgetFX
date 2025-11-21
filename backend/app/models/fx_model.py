@@ -1,3 +1,5 @@
+# fx_model.py
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -14,188 +16,159 @@ from darts.models import TFTModel
 from darts.dataprocessing.transformers import Scaler
 
 
-# -------------------------------------------------------------------
-#  FX Pair
-# -------------------------------------------------------------------
+# ============================================================
+#  FX Pair – Currency Pair Representation
+# ============================================================
 @dataclass
 class FXPair:
-    """
-    Represents a currency pair.
+    base: str   # e.g. "USD"
+    quote: str  # e.g. "JPY"
 
-    base  = home currency  (e.g., "USD")
-    quote = destination/local currency (e.g., "JPY")
-
-    For travel budgeting, we want FX rate as:
-        FX = base_per_quote  (e.g., USD per 1 JPY)
-    so we can do:
-        cost_base = local_cost_quote * FX
-    """
-    base: str
-    quote: str
-
-    def yf_ticker(self) -> str:
+    def ticker(self) -> str:
         """
-        We request QUOTE+BASE in Yahoo (e.g. JPYUSD=X),
-        which returns BASE per 1 QUOTE (USD per JPY).
+        Yahoo Finance format:
+        QUOTE + BASE + "=X"
+        
+        Example:
+        base="USD", quote="JPY" → "JPYUSD=X"
         """
         return f"{self.quote}{self.base}=X"
 
 
-# -------------------------------------------------------------------
-#  FX Fetcher (Yahoo Finance via yfinance)
-# -------------------------------------------------------------------
+# ============================================================
+#  FX Fetcher – Handles yfinance download
+# ============================================================
 class FXFetcher:
     def __init__(self, lookback_years: int = 8):
         self.lookback_years = lookback_years
 
     def fetch_daily(self, pair: FXPair) -> pd.Series:
         """
-        Returns a clean daily series of BASE per QUOTE
-        (e.g., USD per JPY) as a pandas Series.
+        Fetch daily FX rate series.
+        Yahoo returns BASE per QUOTE (USD per 1 JPY).
         """
         end = datetime.utcnow()
         start = end - relativedelta(years=self.lookback_years)
-        ticker = pair.yf_ticker()
+        ticker = pair.ticker()
 
+        # 🟩 FIX: Ensure correct download for all regions, handle retries
         df = yf.download(
-            ticker,
+            tickers=ticker,
             start=start,
             end=end,
             interval="1d",
             auto_adjust=True,
             progress=False,
+            threads=False  # prevents region-related failures
         )
 
-        # Basic sanity checks
-        if not isinstance(df, pd.DataFrame) or df.empty:
-            raise ValueError(f"No data returned for {ticker}")
+        # 🟥 If empty → Yahoo blocked or wrong ticker
+        if df is None or df.empty:
+            raise ValueError(
+                f"Yahoo Finance returned no data for ticker '{ticker}'. "
+                "Try turning off VPN or running on mobile hotspot."
+            )
 
         if "Close" not in df.columns:
-            raise ValueError(f"No 'Close' column for {ticker}")
+            raise ValueError(f"No 'Close' column found in Yahoo response for '{ticker}'")
 
         close = df["Close"]
 
-        # If yfinance gives 2D "Close", take the first column
+        # yfinance sometimes returns multi-column Close
         if isinstance(close, pd.DataFrame):
             close = close.iloc[:, 0]
 
         close = close.dropna()
         if close.empty:
-            raise ValueError(f"No usable Close prices for {ticker}")
+            raise ValueError(f"No valid close prices for '{ticker}'.")
 
-        # Yahoo gives BASE per QUOTE here (e.g., USD per JPY for JPYUSD=X),
-        # which is exactly what we want for budgeting.
-        fx_base_per_quote = close.astype(float)
-        fx_base_per_quote.index = pd.to_datetime(fx_base_per_quote.index).tz_localize(None)
+        # Standardize index and fill missing days
+        close.index = pd.to_datetime(close.index).tz_localize(None)
+        close = close.asfreq("D").interpolate("linear")
 
-        # Force daily frequency and interpolate missing days
-        fx_base_per_quote = (
-            fx_base_per_quote.asfreq("D").interpolate("linear").dropna()
-        )
-        fx_base_per_quote.name = f"{pair.base}->{pair.quote}"
+        close.name = f"{pair.base}->{pair.quote}"
 
-        return fx_base_per_quote
+        return close.astype(float)
 
 
-# -------------------------------------------------------------------
-#  Monthly Forecast dataclass
-# -------------------------------------------------------------------
+# ============================================================
+#  Monthly forecast container
+# ============================================================
 @dataclass
 class MonthlyForecast:
-    month: str  # "YYYY-MM"
+    month: str
     p10: float
     p50: float
     p90: float
 
 
-# -------------------------------------------------------------------
-#  Helper: convert daily TimeSeries → monthly p10/p50/p90
-#  (for now, TFT is deterministic so p10 = p50 = p90)
-# -------------------------------------------------------------------
+# ============================================================
+#  Daily → Monthly converter
+# ============================================================
 def ts_to_monthly(ts: TimeSeries) -> List[MonthlyForecast]:
-    """
-    Converts a daily TimeSeries into monthly averages and wraps into
-    MonthlyForecast objects. Since we're using a deterministic TFT
-    (no quantile likelihood), we set p10 = p50 = p90.
-    """
     s = ts.to_series()
-    df = s.to_frame("p50")
-    df["p10"] = df["p50"]
-    df["p90"] = df["p50"]
 
-    # Resample to monthly start (MS)
+    df = pd.DataFrame({
+        "p50": s,
+        "p10": s,
+        "p90": s
+    })
+
     monthly = df.resample("MS").mean()
 
-    forecasts: List[MonthlyForecast] = []
-    for idx, row in monthly.iterrows():
-        forecasts.append(
-            MonthlyForecast(
-                month=idx.strftime("%Y-%m"),
-                p10=float(row["p10"]),
-                p50=float(row["p50"]),
-                p90=float(row["p90"]),
-            )
+    forecasts = [
+        MonthlyForecast(
+            month=idx.strftime("%Y-%m"),
+            p10=float(row.p10),
+            p50=float(row.p50),
+            p90=float(row.p90),
         )
+        for idx, row in monthly.iterrows()
+    ]
+
     return forecasts
 
 
-# -------------------------------------------------------------------
-#  Ranking logic for travel budget
-# -------------------------------------------------------------------
+# ============================================================
+#  Budget ranking logic
+# ============================================================
 def rank_months(
     forecasts: List[MonthlyForecast],
     budget: float,
     local_cost: float,
-    days: int,
+    days: int
 ) -> List[Dict]:
-    """
-    For each forecast month, compute expected trip cost in BASE currency:
-
-        cost_base = local_cost (QUOTE/day) * days * FX (BASE/QUOTE)
-
-    Since our TFT is deterministic (p10=p90=p50), probability of staying
-    within budget is 1.0 if cost <= budget else 0.0.
-    """
-    ranked: List[Dict] = []
+    ranked = []
 
     for f in forecasts:
         expected_cost = local_cost * days * f.p50
-        p_within = 1.0 if expected_cost <= budget else 0.0
+        prob = 1.0 if expected_cost <= budget else 0.0
 
-        ranked.append(
-            {
-                "month": f.month,
-                "fx_p10": f.p10,
-                "fx_p50": f.p50,
-                "fx_p90": f.p90,
-                "expected_cost": expected_cost,
-                "p_within_budget": p_within,
-            }
-        )
+        ranked.append({
+            "month": f.month,
+            "fx_p10": f.p10,
+            "fx_p50": f.p50,
+            "fx_p90": f.p90,
+            "expected_cost": expected_cost,
+            "p_within_budget": prob,
+        })
 
-    # Sort: highest probability first, then lowest expected cost
     ranked.sort(key=lambda x: (-x["p_within_budget"], x["expected_cost"]))
+
     return ranked
 
 
-# -------------------------------------------------------------------
-#  TFT Wrapper Service (this is what your FastAPI layer will use)
-# -------------------------------------------------------------------
+# ============================================================
+#  TFT FX Service – Main Model Pipeline
+# ============================================================
 class FXService:
-    """
-    High-level service that:
-      1) fetches FX series from Yahoo,
-      2) trains a TFT model,
-      3) produces monthly forecasts usable by the API.
-    """
-
     def __init__(
         self,
         lookback_years: int = 8,
         input_chunk_length: int = 365,
         output_chunk_length: int = 180,
         n_epochs: int = 50,
-        seed: int = 42,
+        seed: int = 42
     ):
         self.fetcher = FXFetcher(lookback_years)
         self.input_chunk_length = input_chunk_length
@@ -206,14 +179,10 @@ class FXService:
         self._scaler: Optional[Scaler] = None
         self._model: Optional[TFTModel] = None
 
-    # ------------------ internal helpers ------------------ #
+    # ---------------- helpers ---------------- #
 
     def _build_model(self) -> TFTModel:
-        """
-        Create a TFT model that uses automatic time encoders
-        (no manual covariates needed → fewer bugs).
-        """
-        model = TFTModel(
+        return TFTModel(
             input_chunk_length=self.input_chunk_length,
             output_chunk_length=self.output_chunk_length,
             hidden_size=64,
@@ -230,56 +199,32 @@ class FXService:
             random_state=self.seed,
             pl_trainer_kwargs={"enable_progress_bar": False},
         )
-        return model
 
-    def _fit_tft(self, series: pd.Series) -> None:
-        """
-        Scale the target series and fit TFT.
-        """
-        # Build TimeSeries and cast to float32 for Torch
+    def _fit_tft(self, series: pd.Series):
         ts = TimeSeries.from_series(series.astype(np.float32))
 
-        # Scale target
         self._scaler = Scaler()
         ts_scaled = self._scaler.fit_transform(ts)
 
-        # Initialize and fit TFT
         self._model = self._build_model()
-        # Note: with add_relative_index/add_encoders, we don't need explicit covariates
         self._model.fit(ts_scaled, verbose=False)
 
-    def _predict_daily(self, days_ahead: int) -> TimeSeries:
-        """
-        Predict `days_ahead` days into the future and inverse transform.
-        """
+    def _predict_daily(self, days: int) -> TimeSeries:
         if self._model is None or self._scaler is None:
             raise RuntimeError("Model has not been trained yet.")
 
-        # Predict on scaled domain
-        pred_scaled = self._model.predict(days_ahead)
+        pred_scaled = self._model.predict(days)
+        return self._scaler.inverse_transform(pred_scaled)
 
-        # Back to original scale
-        pred = self._scaler.inverse_transform(pred_scaled)
-        return pred
-
-    # ------------------ public API ------------------ #
+    # ---------------- public API ---------------- #
 
     def forecast_monthly(self, pair: FXPair, h_months: int = 12) -> List[MonthlyForecast]:
-        """
-        Main entrypoint:
-          - fetches daily FX series for `pair`,
-          - trains TFT,
-          - predicts `h_months` into the future,
-          - returns list[MonthlyForecast].
-        """
         series = self.fetcher.fetch_daily(pair)
 
-        # train TFT on this series
         self._fit_tft(series)
 
-        # approximate horizon in days
-        horizon_days = int(h_months * 30)
+        horizon_days = h_months * 30
         pred_ts = self._predict_daily(horizon_days)
 
-        monthly_forecasts = ts_to_monthly(pred_ts)
-        return monthly_forecasts[:h_months]
+        monthly = ts_to_monthly(pred_ts)
+        return monthly[:h_months]
