@@ -37,18 +37,18 @@ export default function FXForecast({ baseCurrency, targetCurrency, visible }: FX
         }
     }
 
-    const { points, areaPath, minRate, maxRate, bestDay } = useMemo(() => {
-        if (data.length === 0) return { points: '', areaPath: '', minRate: 0, maxRate: 0, bestDay: null }
+    const { points, areaPath, minRate, maxRate, bestDay, currentRate, trend, avgRate } = useMemo(() => {
+        if (data.length === 0) return { points: '', areaPath: '', minRate: 0, maxRate: 0, bestDay: null, currentRate: 0, trend: 0, avgRate: 0 }
 
         const rates = data.map(d => d.rate)
         const min = Math.min(...rates)
         const max = Math.max(...rates)
         const range = max - min || 1 // Avoid division by zero
+        const currentRate = rates[0]
+        const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length
+        const trend = ((rates[rates.length - 1] - rates[0]) / rates[0]) * 100
 
-        // Find best day (highest rate if selling base currency, but usually we want more target currency per base unit)
-        // Assuming base -> target (e.g. USD -> JPY), we want the HIGHEST rate (more JPY for 1 USD).
-        // Wait, usually "best time to buy" means when the currency you HAVE is strongest.
-        // So yes, highest rate.
+        // Find best day (highest rate)
         const bestRate = Math.max(...rates)
         const bestDayIndex = rates.indexOf(bestRate)
         const bestDay = data[bestDayIndex]
@@ -77,7 +77,10 @@ export default function FXForecast({ baseCurrency, targetCurrency, visible }: FX
             areaPath: areaPathStr,
             minRate: min,
             maxRate: max,
-            bestDay
+            bestDay,
+            currentRate,
+            trend,
+            avgRate
         }
     }, [data])
 
@@ -96,6 +99,26 @@ export default function FXForecast({ baseCurrency, targetCurrency, visible }: FX
                 <div className="error-message">{error}</div>
             ) : (
                 <>
+                    <div className="forecast-stats">
+                        <div className="stat-item">
+                            <span className="stat-label">Current Rate</span>
+                            <span className="stat-value">{currentRate.toFixed(4)}</span>
+                        </div>
+                        <div className="stat-item">
+                            <span className="stat-label">30-Day Trend</span>
+                            <span className={`stat-value ${trend >= 0 ? 'positive' : 'negative'}`}>
+                                {trend >= 0 ? '↗' : '↘'} {Math.abs(trend).toFixed(2)}%
+                            </span>
+                        </div>
+                        <div className="stat-item">
+                            <span className="stat-label">Average Rate</span>
+                            <span className="stat-value">{avgRate.toFixed(4)}</span>
+                        </div>
+                        <div className="stat-item">
+                            <span className="stat-label">Range</span>
+                            <span className="stat-value">{minRate.toFixed(4)} - {maxRate.toFixed(4)}</span>
+                        </div>
+                    </div>
                     <div className="chart-container">
                         <svg className="chart-svg" viewBox="0 0 100 50" preserveAspectRatio="none">
                             <defs>
@@ -105,7 +128,7 @@ export default function FXForecast({ baseCurrency, targetCurrency, visible }: FX
                                 </linearGradient>
                             </defs>
 
-                            {/* Grid lines (optional, simplified) */}
+                            {/* Grid lines */}
                             <line x1="0" y1="5" x2="100" y2="5" className="chart-grid-line" />
                             <line x1="0" y1="25" x2="100" y2="25" className="chart-grid-line" />
                             <line x1="0" y1="45" x2="100" y2="45" className="chart-grid-line" />
@@ -113,9 +136,15 @@ export default function FXForecast({ baseCurrency, targetCurrency, visible }: FX
                             <path d={areaPath} className="chart-area" />
                             <polyline points={points} className="chart-line" />
 
-                            {/* Min/Max labels */}
-                            <text x="2" y="8" className="chart-axis-text">{maxRate.toFixed(4)}</text>
-                            <text x="2" y="48" className="chart-axis-text">{minRate.toFixed(4)}</text>
+                            {/* Y-axis labels */}
+                            <text x="1" y="6" className="chart-axis-text">{maxRate.toFixed(2)}</text>
+                            <text x="1" y="26" className="chart-axis-text">{((maxRate + minRate) / 2).toFixed(2)}</text>
+                            <text x="1" y="46" className="chart-axis-text">{minRate.toFixed(2)}</text>
+                            
+                            {/* X-axis date labels */}
+                            <text x="5" y="52" className="chart-date-text">Today</text>
+                            <text x="47" y="52" className="chart-date-text" textAnchor="middle">Day 15</text>
+                            <text x="93" y="52" className="chart-date-text" textAnchor="end">Day 30</text>
                         </svg>
                     </div>
 

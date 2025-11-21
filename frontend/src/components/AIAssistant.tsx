@@ -434,8 +434,8 @@ function AIAssistant({ onBack, tripData }: AIAssistantProps) {
 
       {tripData && showForecast && (
         <FXForecast
-          baseCurrency={tripData.homeCurrency}
-          targetCurrency={getCurrencyForCountry(tripData.country)}
+          baseCurrency={getCurrencyForCountry(tripData.country)}
+          targetCurrency={tripData.homeCurrency}
           visible={true}
         />
       )}
