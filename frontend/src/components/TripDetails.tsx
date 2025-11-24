@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import './TripDetails.css'
 import type { TripData } from '../types'
+import Silk from './Silk'
 
 interface TripDetailsProps {
   onContinue: (data: TripData) => void
@@ -207,6 +208,15 @@ function TripDetails({ onContinue, onBack }: TripDetailsProps) {
 
   return (
     <div className="trip-details-page">
+      <div className="silk-background">
+        <Silk
+          speed={5}
+          scale={1}
+          color="#5227FF"
+          noiseIntensity={1.5}
+          rotation={0}
+        />
+      </div>
       <header className="trip-details-header">
         <h1 className="trip-details-logo" onClick={onBack}>TravelBudgetFX</h1>
         <button className="back-button" onClick={onBack} aria-label="Back to landing page">
