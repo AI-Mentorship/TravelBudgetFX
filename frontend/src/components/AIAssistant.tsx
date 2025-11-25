@@ -41,7 +41,7 @@ function AIAssistant({ onBack, tripData }: AIAssistantProps) {
     if (tripData && messages.length === 0) {
       const initialMessage: Message = {
         id: 1,
-        text: `Great! I see you're planning a trip to ${tripData.country} for ${tripData.duration} days with a budget of ${tripData.budget} ${tripData.homeCurrency}, departing on ${new Date(tripData.travelDate).toLocaleDateString()}.\n\nLet me ask you a few questions to create the perfect itinerary for you:\n\n1. What type of traveler are you? (Adventure seeker, Cultural explorer, Relaxation focused, Foodie, etc.)`,
+        text: `Great! I see you're planning a trip to ${tripData.country} for ${tripData.duration} days with a budget of ${tripData.budget} ${tripData.homeCurrency}, departing on ${tripData.travelDate}.\n\nLet me ask you a few questions to create the perfect itinerary for you:\n\n1. What type of traveler are you? (Adventure seeker, Cultural explorer, Relaxation focused, Foodie, etc.)`,
         sender: 'ai'
       }
       setMessages([initialMessage])
@@ -53,15 +53,62 @@ function AIAssistant({ onBack, tripData }: AIAssistantProps) {
   }, [tripData])
 
   const generateTravelRating = (data: TripData) => {
-    // Simulate rating calculation (in real app, this would come from backend)
     const budgetPerDay = parseFloat(data.budget) / parseInt(data.duration)
-    const affordability = Math.min(10, Math.max(1, budgetPerDay / 100))
-
+    const duration = parseInt(data.duration)
+    
+    // Calculate affordability (1-10 scale based on budget per day)
+    // Lower budget/day = higher affordability score
+    const affordability = budgetPerDay < 50 ? 9.0 :
+                         budgetPerDay < 100 ? 7.5 :
+                         budgetPerDay < 200 ? 6.0 :
+                         budgetPerDay < 400 ? 4.5 : 3.0
+    
+    // Calculate seasonality based on current month
+    const currentMonth = new Date().getMonth() + 1 // 1-12
+    const country = data.country.toLowerCase()
+    
+    // Peak travel months vary by destination
+    let seasonality = 7.0 // Default
+    if (country.includes('europe') || country.includes('france') || country.includes('italy') || country.includes('spain')) {
+      // Europe peak: May-Sept
+      seasonality = (currentMonth >= 5 && currentMonth <= 9) ? 9.0 : 6.0
+    } else if (country.includes('japan') || country.includes('korea')) {
+      // Asia peak: March-May, Sept-Nov
+      seasonality = ((currentMonth >= 3 && currentMonth <= 5) || (currentMonth >= 9 && currentMonth <= 11)) ? 9.0 : 6.5
+    } else if (country.includes('australia') || country.includes('new zealand')) {
+      // Southern hemisphere: Dec-Feb
+      seasonality = (currentMonth >= 12 || currentMonth <= 2) ? 9.0 : 6.5
+    } else if (country.includes('thailand') || country.includes('vietnam') || country.includes('bali')) {
+      // Southeast Asia: Nov-Feb
+      seasonality = (currentMonth >= 11 || currentMonth <= 2) ? 9.0 : 5.5
+    }
+    
+    // Calculate accessibility based on duration and popular destinations
+    let accessibility = 7.0
+    if (duration <= 5) {
+      accessibility = 9.0 // Easy short trip
+    } else if (duration <= 14) {
+      accessibility = 8.0 // Moderate
+    } else {
+      accessibility = 6.5 // Requires more planning
+    }
+    
+    // Boost for popular tourist destinations
+    if (country.includes('paris') || country.includes('london') || country.includes('tokyo') || 
+        country.includes('new york') || country.includes('dubai')) {
+      accessibility += 1.0
+    }
+    
+    accessibility = Math.min(10, accessibility)
+    
+    // Calculate overall rating (weighted average)
+    const overall = ((affordability * 0.3) + (seasonality * 0.3) + (accessibility * 0.4))
+    
     const rating: TravelRating = {
-      overall: 8.5,
-      affordability: affordability,
-      seasonality: 8.0,
-      accessibility: 9.0
+      overall: Math.round(overall * 10) / 10, // Round to 1 decimal
+      affordability: Math.round(affordability * 10) / 10,
+      seasonality: Math.round(seasonality * 10) / 10,
+      accessibility: Math.round(accessibility * 10) / 10
     }
     setTravelRating(rating)
   }
@@ -188,7 +235,32 @@ function AIAssistant({ onBack, tripData }: AIAssistantProps) {
         const shouldGenerateItinerary = isItineraryRequest || questionsAsked >= maxQuestions
 
         if (shouldGenerateItinerary) {
-          systemContext += ' IMPORTANT: The user has answered all questions. You MUST now generate a complete, detailed day-by-day itinerary. Format it as:\n\nDay 1:\n- Morning: [activity]\n- Afternoon: [activity]\n- Evening: [activity]\n- Estimated cost: [amount]\n\nDay 2: ... etc. Include all days based on the trip duration. Add travel tips and recommendations.'
+          systemContext += ` IMPORTANT: The user has answered all questions. You MUST now generate a complete, detailed day-by-day itinerary. 
+
+Format it EXACTLY like this (use **bold** for headers):
+
+**Day 1: Arrival & Exploration**
+- Morning: [activity with specific location]
+- Afternoon: [activity with specific location]  
+- Evening: [activity with specific location]
+- Estimated cost: [amount in local currency]
+
+**Day 2: [Theme for the day]**
+- Morning: [activity with specific location]
+- Afternoon: [activity with specific location]
+- Evening: [activity with specific location]
+- Estimated cost: [amount in local currency]
+
+Continue for all ${tripData?.duration || 'scheduled'} days. At the end, add:
+
+**Travel Tips:**
+- [Tip 1]
+- [Tip 2]
+- [Tip 3]
+
+**Budget Summary:**
+- Total estimated cost: [amount]
+- Recommended exchange: [advice]`
         } else if (questionsAsked < maxQuestions) {
           systemContext += ` Ask question ${questionsAsked + 1} of ${maxQuestions} about their preferences (dietary restrictions, must-see attractions, activity level, accommodation preferences, etc.). Keep the question brief and conversational.`
         }
@@ -202,26 +274,56 @@ function AIAssistant({ onBack, tripData }: AIAssistantProps) {
         // Determine if this is an itinerary response
         const isItineraryResponse = shouldGenerateItinerary
 
-        // Add AI response to UI
+        // Clean up response and convert markdown to HTML for display
+        const cleanedResponse = response.response
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>') // Convert **text** to <strong>
+          .replace(/\*([^*]+)\*/g, '<em>$1</em>') // Convert *text* to <em>
+          .replace(/^- /gm, '• ') // Convert markdown bullets to bullet points
+          .replace(/^(\d+)\. /gm, '<strong>$1.</strong> ') // Bold numbered items
+          .trim()
+
+        // Add AI response to UI with typewriter effect
         const aiMessageObj: Message = {
           id: updatedMessages.length + 1,
-          text: response.response,
+          text: '',
           sender: 'ai',
           isItinerary: isItineraryResponse
         }
         setMessages(prev => [...prev, aiMessageObj])
 
+        // Typewriter effect
+        let charIndex = 0
+        const typewriterSpeed = 15 // ms per character
+        const typewriterInterval = setInterval(() => {
+          if (charIndex < cleanedResponse.length) {
+            setMessages(prev => {
+              const updated = [...prev]
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                text: cleanedResponse.substring(0, charIndex + 1)
+              }
+              return updated
+            })
+            charIndex++
+          } else {
+            clearInterval(typewriterInterval)
+            
+            // Ask about PDF AFTER typewriter finishes for itinerary
+            if (isItineraryResponse) {
+              setTimeout(() => {
+                setMessages(prev => [...prev, {
+                  id: prev.length + 1,
+                  text: "Would you like me to export this itinerary as a PDF document? 📄",
+                  sender: 'ai',
+                  isPdfQuestion: true
+                }])
+              }, 500) // Small delay after typewriter finishes
+            }
+          }
+        }, typewriterSpeed)
+
         if (isItineraryResponse) {
           setItineraryGenerated(true)
-          // Ask about PDF after a short delay
-          setTimeout(() => {
-            setMessages(prev => [...prev, {
-              id: prev.length + 1,
-              text: "Would you like me to export this itinerary as a PDF document?",
-              sender: 'ai',
-              isPdfQuestion: true
-            }])
-          }, 2000)
         } else if (questionsAsked < maxQuestions && !isItineraryRequest) {
           setQuestionsAsked(prev => prev + 1)
         }
@@ -252,58 +354,121 @@ function AIAssistant({ onBack, tripData }: AIAssistantProps) {
     const doc = new jsPDF()
 
     // Title
-    doc.setFontSize(20)
+    doc.setFontSize(24)
     doc.setFont('helvetica', 'bold')
-    doc.text('Travel Itinerary', 105, 20, { align: 'center' })
+    doc.setTextColor(82, 39, 255) // #5227FF brand color
+    doc.text('Travel Itinerary', 105, 25, { align: 'center' })
 
-    // Trip Details
-    doc.setFontSize(12)
+    // Subtitle line
+    doc.setDrawColor(82, 39, 255)
+    doc.setLineWidth(0.5)
+    doc.line(30, 32, 180, 32)
+
+    // Trip Details Section
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    let yPos = 45
+
+    doc.text('Trip Details', 20, yPos)
+    yPos += 10
+    
+    doc.setFontSize(11)
     doc.setFont('helvetica', 'normal')
-    let yPos = 40
-
-    doc.text('Trip Details:', 20, yPos)
-    yPos += 8
-    doc.setFontSize(10)
     doc.text(`Destination: ${tripData.country}`, 25, yPos)
-    yPos += 6
+    yPos += 7
     doc.text(`Duration: ${tripData.duration} days`, 25, yPos)
-    yPos += 6
+    yPos += 7
     doc.text(`Budget: ${tripData.budget} ${tripData.homeCurrency}`, 25, yPos)
-    yPos += 6
-    doc.text(`Travel Date: ${new Date(tripData.travelDate).toLocaleDateString()}`, 25, yPos)
+    yPos += 7
+    doc.text(`Travel Date: ${tripData.travelDate}`, 25, yPos)
+    yPos += 15
+
+    // Itinerary content section
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(82, 39, 255)
+    doc.text('Your Personalized Itinerary', 20, yPos)
     yPos += 12
 
-    // Itinerary content
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Your Itinerary:', 20, yPos)
-    yPos += 8
-
+    doc.setTextColor(0, 0, 0)
     doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
 
-    // Split text into lines that fit the page
-    const maxWidth = 170
-    const lines = doc.splitTextToSize(itineraryMessage.text, maxWidth)
+    // Clean the itinerary text for PDF (remove HTML tags, keep structure)
+    const pdfText = itineraryMessage.text
+      .replace(/<strong>/g, '')
+      .replace(/<\/strong>/g, '')
+      .replace(/<em>/g, '')
+      .replace(/<\/em>/g, '')
+      .replace(/<br\s*\/?>/g, '\n')
+
+    // Split into lines and format properly
+    const lines = pdfText.split('\n')
+    const maxWidth = 165
 
     lines.forEach((line: string) => {
-      if (yPos > 280) { // Add new page if needed
+      if (yPos > 275) { // Add new page if needed
         doc.addPage()
-        yPos = 20
+        yPos = 25
       }
-      doc.text(line, 20, yPos)
-      yPos += 6
+
+      const trimmedLine = line.trim()
+      
+      // Check if this is a day header (e.g., "Day 1:", "Day 2 - Adventure:")
+      if (/^Day\s+\d+/i.test(trimmedLine)) {
+        yPos += 5 // Extra spacing before day headers
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(12)
+        doc.setTextColor(82, 39, 255)
+        doc.text(trimmedLine, 20, yPos)
+        doc.setTextColor(0, 0, 0)
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        yPos += 8
+      } else if (trimmedLine.startsWith('•') || trimmedLine.startsWith('-')) {
+        // Bullet point
+        const bulletText = trimmedLine.replace(/^[•-]\s*/, '')
+        const wrappedLines = doc.splitTextToSize(bulletText, maxWidth - 10)
+        wrappedLines.forEach((wrappedLine: string, idx: number) => {
+          if (yPos > 275) {
+            doc.addPage()
+            yPos = 25
+          }
+          if (idx === 0) {
+            doc.text('•', 25, yPos)
+            doc.text(wrappedLine, 32, yPos)
+          } else {
+            doc.text(wrappedLine, 32, yPos)
+          }
+          yPos += 6
+        })
+      } else if (trimmedLine.length > 0) {
+        // Regular text
+        const wrappedLines = doc.splitTextToSize(trimmedLine, maxWidth)
+        wrappedLines.forEach((wrappedLine: string) => {
+          if (yPos > 275) {
+            doc.addPage()
+            yPos = 25
+          }
+          doc.text(wrappedLine, 20, yPos)
+          yPos += 6
+        })
+      } else {
+        // Empty line - add small spacing
+        yPos += 3
+      }
     })
 
-    // Footer
-    if (yPos > 270) {
-      doc.addPage()
-      yPos = 20
+    // Footer on last page
+    const pageCount = doc.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'italic')
+      doc.setTextColor(128, 128, 128)
+      doc.text('Generated by TravelBudgetFX', 105, 290, { align: 'center' })
+      doc.text(`Page ${i} of ${pageCount}`, 190, 290, { align: 'right' })
     }
-    yPos = 285
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'italic')
-    doc.text('Generated by TravelBudgetFX', 105, yPos, { align: 'center' })
 
     // Save the PDF
     doc.save(`${tripData.country}-itinerary.pdf`)
@@ -329,7 +494,7 @@ function AIAssistant({ onBack, tripData }: AIAssistantProps) {
                 <div><strong>Destination:</strong> {tripData.country}</div>
                 <div><strong>Duration:</strong> {tripData.duration} days</div>
                 <div><strong>Budget:</strong> {tripData.budget} {tripData.homeCurrency}</div>
-                <div><strong>Departure:</strong> {new Date(tripData.travelDate).toLocaleDateString()}</div>
+                <div><strong>Departure:</strong> {tripData.travelDate}</div>
               </div>
             </div>
           )}
@@ -341,7 +506,11 @@ function AIAssistant({ onBack, tripData }: AIAssistantProps) {
                   key={message.id}
                   className={`chat-message ${message.sender === 'ai' ? 'ai-message' : 'user-message'} ${message.isItinerary ? 'itinerary-message' : ''}`}
                 >
-                  {message.text}
+                  {message.sender === 'ai' ? (
+                    <span dangerouslySetInnerHTML={{ __html: message.text.replace(/\n/g, '<br />') }} />
+                  ) : (
+                    message.text
+                  )}
                   {message.isItinerary && (
                     <button className="export-pdf-button" onClick={handleExportPDF}>
                       📄 Export as PDF

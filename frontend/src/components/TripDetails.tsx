@@ -173,7 +173,7 @@ const CURRENCIES = [
 ]
 
 function TripDetails({ onContinue, onBack }: TripDetailsProps) {
-  const [homeCurrency, setHomeCurrency] = useState('')
+  const [homeCurrency, setHomeCurrency] = useState('USD')
   const [currencySearch, setCurrencySearch] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
   const [budget, setBudget] = useState('')

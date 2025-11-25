@@ -189,8 +189,19 @@
 
 .itinerary-message {
   max-width: 100%;
-  background: linear-gradient(135deg, rgba(75, 0, 130, 0.7), rgba(139, 69, 139, 0.7));
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, rgba(82, 39, 255, 0.5), rgba(139, 69, 200, 0.5));
+  border: 2px solid rgba(82, 39, 255, 0.4);
+}
+
+.itinerary-message strong {
+  color: #a78bfa;
+  display: inline-block;
+  margin-top: 0.5rem;
+}
+
+.itinerary-message em {
+  color: rgba(255, 255, 255, 0.9);
+  font-style: italic;
 }
 
 .export-pdf-button {

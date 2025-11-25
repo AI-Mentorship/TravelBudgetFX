@@ -45,8 +45,8 @@ function LandingPage({ onGetStarted }: LandingPageProps) {
         />
       </ErrorBoundary>
       <div className="landing-content">
-        <p className="landing-subtitle">Vacation + Being Lazy.</p>
-        <h1 className="landing-title">Vacazy<span className="title-thin">FX</span></h1>
+        <p className="landing-subtitle">Travel Planning + Currency Intelligence</p>
+        <h1 className="landing-title">TravelBudget<span className="title-thin">FX</span></h1>
         <button className="get-started-button" onClick={onGetStarted}>
           Get Started
         </button>
