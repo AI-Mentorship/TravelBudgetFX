@@ -1,6 +1,31 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Line } from 'react-chartjs-2'
+import type { ChartOptions, TooltipItem } from 'chart.js'
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+} from 'chart.js'
 import { getCurrencyForecast, type ForecastData } from '../services/api'
 import './FXForecast.css'
+
+// Register ChartJS components
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+)
 
 interface FXForecastProps {
     baseCurrency: string
@@ -12,6 +37,7 @@ export default function FXForecast({ baseCurrency, targetCurrency, visible }: FX
     const [data, setData] = useState<ForecastData[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const chartRef = useRef(null)
 
     useEffect(() => {
         if (visible && baseCurrency && targetCurrency) {
@@ -37,54 +63,119 @@ export default function FXForecast({ baseCurrency, targetCurrency, visible }: FX
         }
     }
 
-    const { points, areaPath, minRate, maxRate, bestDay, currentRate, trend, avgRate } = useMemo(() => {
-        if (data.length === 0) return { points: '', areaPath: '', minRate: 0, maxRate: 0, bestDay: null, currentRate: 0, trend: 0, avgRate: 0 }
+    const chartData = {
+        labels: data.map((d, i) => {
+            if (i === 0) return 'Today'
+            if (i === 15) return 'Day 15'
+            if (i === data.length - 1) return `Day ${i}`
+            return ''
+        }),
+        datasets: [
+            {
+                label: `${baseCurrency}/${targetCurrency} Exchange Rate`,
+                data: data.map(d => d.rate),
+                borderColor: '#4facfe',
+                backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                borderWidth: 4,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 5,
+                pointHoverRadius: 8,
+                pointBackgroundColor: '#4facfe',
+                pointBorderColor: 'rgba(255, 255, 255, 0.9)',
+                pointBorderWidth: 2,
+                pointHoverBackgroundColor: '#00f2fe',
+                pointHoverBorderColor: 'rgba(255, 255, 255, 1)',
+                segment: {
+                    borderColor: ctx => '#4facfe'
+                }
+            }
+        ]
+    }
 
-        const rates = data.map(d => d.rate)
-        const min = Math.min(...rates)
-        const max = Math.max(...rates)
-        const range = max - min || 1 // Avoid division by zero
-        const currentRate = rates[0]
-        const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length
-        const trend = ((rates[rates.length - 1] - rates[0]) / rates[0]) * 100
-
-        // Find best day (highest rate)
-        const bestRate = Math.max(...rates)
-        const bestDayIndex = rates.indexOf(bestRate)
-        const bestDay = data[bestDayIndex]
-
-        const width = 100 // ViewBox width
-        const height = 50 // ViewBox height
-        const padding = 5
-
-        const pointsArray = data.map((d, i) => {
-            const x = (i / (data.length - 1)) * (width - padding * 2) + padding
-            // Invert Y because SVG 0 is top
-            const normalizedRate = (d.rate - min) / range
-            const y = height - padding - (normalizedRate * (height - padding * 2))
-            return `${x},${y}`
-        })
-
-        const pointsStr = pointsArray.join(' ')
-
-        // Create area path (closed shape)
-        const firstPoint = pointsArray[0]
-        const lastPoint = pointsArray[pointsArray.length - 1]
-        const areaPathStr = `M ${firstPoint} L ${pointsStr} L ${lastPoint.split(',')[0]},${height} L ${firstPoint.split(',')[0]},${height} Z`
-
-        return {
-            points: pointsStr,
-            areaPath: areaPathStr,
-            minRate: min,
-            maxRate: max,
-            bestDay,
-            currentRate,
-            trend,
-            avgRate
+    const chartOptions: ChartOptions<'line'> = {
+        responsive: true,
+        maintainAspectRatio: true,
+        interaction: {
+            mode: 'index',
+            intersect: false
+        },
+        plugins: {
+            legend: {
+                display: true,
+                labels: {
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    font: { size: 14, weight: '500' },
+                    padding: 20
+                }
+            },
+            tooltip: {
+                enabled: true,
+                backgroundColor: 'rgba(0, 0, 0, 0.95)',
+                titleColor: 'rgba(79, 172, 254, 0.9)',
+                bodyColor: 'rgba(255, 255, 255, 0.85)',
+                borderColor: 'rgba(79, 172, 254, 0.5)',
+                borderWidth: 1,
+                padding: 12,
+                titleFont: { size: 14, weight: '600' },
+                bodyFont: { size: 13, weight: '500' },
+                callbacks: {
+                    title: (context: TooltipItem<'line'>[]) => {
+                        const dataIndex = context[0].dataIndex
+                        const date = data[dataIndex]
+                        return `Day ${dataIndex}: ${new Date(date.date).toLocaleDateString()}`
+                    },
+                    label: (context: TooltipItem<'line'>) => {
+                        return `Rate: ${context.parsed.y.toFixed(6)}`
+                    },
+                    afterLabel: (context: TooltipItem<'line'>) => {
+                        const dataIndex = context.dataIndex
+                        const currentRate = data[0].rate
+                        const changePercent = ((data[dataIndex].rate - currentRate) / currentRate) * 100
+                        return `Change: ${changePercent > 0 ? '+' : ''}${changePercent.toFixed(2)}%`
+                    }
+                }
+            }
+        },
+        scales: {
+            x: {
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.05)',
+                    lineWidth: 0.5
+                },
+                ticks: {
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    font: { size: 12 }
+                }
+            },
+            y: {
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.08)',
+                    lineWidth: 0.5
+                },
+                ticks: {
+                    color: 'rgba(255, 255, 255, 0.6)',
+                    font: { size: 12 },
+                    callback: function(value) {
+                        return (value as number).toFixed(5)
+                    }
+                }
+            }
         }
-    }, [data])
+    }
 
     if (!visible) return null
+
+    const rates = data.map(d => d.rate)
+    const minRate = rates.length > 0 ? Math.min(...rates) : 0
+    const maxRate = rates.length > 0 ? Math.max(...rates) : 0
+    const currentRate = rates.length > 0 ? rates[0] : 0
+    const avgRate = rates.length > 0 ? rates.reduce((a, b) => a + b, 0) / rates.length : 0
+    const trend = rates.length > 0 ? ((rates[rates.length - 1] - rates[0]) / rates[0]) * 100 : 0
+
+    const bestRate = Math.max(...rates)
+    const bestDayIndex = rates.indexOf(bestRate)
+    const bestDay = data[bestDayIndex]
 
     return (
         <div className="fx-forecast-container">
@@ -119,33 +210,9 @@ export default function FXForecast({ baseCurrency, targetCurrency, visible }: FX
                             <span className="stat-value">{minRate.toFixed(4)} - {maxRate.toFixed(4)}</span>
                         </div>
                     </div>
-                    <div className="chart-container">
-                        <svg className="chart-svg" viewBox="0 0 100 50" preserveAspectRatio="none">
-                            <defs>
-                                <linearGradient id="gradient" x1="0" x2="0" y1="0" y2="1">
-                                    <stop offset="0%" stopColor="#4facfe" stopOpacity="0.5" />
-                                    <stop offset="100%" stopColor="#4facfe" stopOpacity="0" />
-                                </linearGradient>
-                            </defs>
 
-                            {/* Grid lines */}
-                            <line x1="0" y1="5" x2="100" y2="5" className="chart-grid-line" />
-                            <line x1="0" y1="25" x2="100" y2="25" className="chart-grid-line" />
-                            <line x1="0" y1="45" x2="100" y2="45" className="chart-grid-line" />
-
-                            <path d={areaPath} className="chart-area" />
-                            <polyline points={points} className="chart-line" />
-
-                            {/* Y-axis labels */}
-                            <text x="1" y="6" className="chart-axis-text">{maxRate.toFixed(2)}</text>
-                            <text x="1" y="26" className="chart-axis-text">{((maxRate + minRate) / 2).toFixed(2)}</text>
-                            <text x="1" y="46" className="chart-axis-text">{minRate.toFixed(2)}</text>
-                            
-                            {/* X-axis date labels */}
-                            <text x="5" y="52" className="chart-date-text">Today</text>
-                            <text x="47" y="52" className="chart-date-text" textAnchor="middle">Day 15</text>
-                            <text x="93" y="52" className="chart-date-text" textAnchor="end">Day 30</text>
-                        </svg>
+                    <div className="chart-wrapper">
+                        <Line ref={chartRef} data={chartData} options={chartOptions} />
                     </div>
 
                     {bestDay && (
