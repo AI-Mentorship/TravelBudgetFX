@@ -173,7 +173,7 @@ const CURRENCIES = [
 ]
 
 function TripDetails({ onContinue, onBack }: TripDetailsProps) {
-  const [homeCurrency, setHomeCurrency] = useState('USD')
+  const [homeCurrency, setHomeCurrency] = useState('')
   const [currencySearch, setCurrencySearch] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
   const [budget, setBudget] = useState('')
@@ -237,12 +237,15 @@ function TripDetails({ onContinue, onBack }: TripDetailsProps) {
                 type="text"
                 className="form-input currency-input"
                 placeholder="Search or select currency..."
-                value={currencySearch || homeCurrency}
+                value={showDropdown ? currencySearch : (homeCurrency || '')}
                 onChange={(e) => {
                   setCurrencySearch(e.target.value)
                   setShowDropdown(true)
                 }}
-                onFocus={() => setShowDropdown(true)}
+                onFocus={() => {
+                  setCurrencySearch('')
+                  setShowDropdown(true)
+                }}
               />
               {showDropdown && (
                 <>

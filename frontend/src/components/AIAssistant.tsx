@@ -4,6 +4,7 @@ import { sendChatMessage, type ChatMessage as ChatMessageType } from '../service
 import type { TripData } from '../types'
 import jsPDF from 'jspdf'
 import FXForecast from './FXForecast'
+import Silk from './Silk'
 
 interface AIAssistantProps {
   onBack: () => void
@@ -476,6 +477,24 @@ Continue for all ${tripData?.duration || 'scheduled'} days. At the end, add:
 
   return (
     <div className="ai-assistant-page">
+      <div className="silk-background-chat">
+        <Silk
+          speed={3}
+          scale={1.2}
+          color="#5227FF"
+          noiseIntensity={1.8}
+          rotation={0}
+        />
+      </div>
+      <div className="floating-particles">
+        {[...Array(15)].map((_, i) => (
+          <div key={i} className="particle" style={{
+            left: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 5}s`,
+            animationDuration: `${15 + Math.random() * 10}s`
+          }} />
+        ))}
+      </div>
       <header className="ai-assistant-header">
         <h1 className="ai-assistant-logo" onClick={onBack}>TravelBudgetFX</h1>
         <button className="back-button" onClick={onBack} aria-label="Back to trip details">
